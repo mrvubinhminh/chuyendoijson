@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel ↔ JSON Converter</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load SheetJS for Excel processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Load Phosphor Icons for UI elements -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        
+        #json-editor {
+            font-family: 'Courier New', Courier, monospace;
+            tab-size: 2;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i class="ph ph-arrows-left-right text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold text-slate-900">Excel <span class="text-slate-400 font-normal">↔</span> JSON Converter</h1>
+            </div>
+            <a href="#how-to-use" class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
+                <i class="ph ph-info"></i> How to use
+            </a>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-6xl mx-auto w-full px-4 py-8 flex flex-col gap-8">
+        
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <!-- Tabs -->
+            <div class="flex border-b border-slate-200 bg-slate-50">
+                <button id="tab-excel-to-json" class="flex-1 py-4 px-6 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors tab-active flex items-center justify-center gap-2" onclick="switchTab('excel-to-json')">
+                    <i class="ph ph-file-xls text-green-600 text-lg"></i> Excel to JSON
+                </button>
+                <button id="tab-json-to-excel" class="flex-1 py-4 px-6 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2" onclick="switchTab('json-to-excel')">
+                    <i class="ph ph-brackets-curly text-blue-600 text-lg"></i> JSON to Excel
+                </button>
+            </div>
+
+            <!-- Cấu hình Đặt tên file chung -->
+            <div class="bg-blue-50 border-b border-slate-200 p-4 md:px-6 flex flex-col gap-3">
+                <h4 class="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                    <i class="ph ph-tag"></i> Đặt tên file trước khi tải về
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-blue-700 mb-1">Khối/Lớp</label>
+                        <select id="global-grade" class="w-full border border-blue-200 rounded-md p-2 text-sm outline-none focus:border-blue-500 bg-white" onchange="updateFileNamePreview()">
+                            <option value="Lop10">Lớp 10</option>
+                            <option value="Lop11">Lớp 11</option>
+                            <option value="Lop12">Lớp 12</option>
+                            <option value="Khac">Khác</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-blue-700 mb-1">Tên bài</label>
+                        <input type="text" id="global-lesson" placeholder="VD: ToanHinh Chuong1" class="w-full border border-blue-200 rounded-md p-2 text-sm outline-none focus:border-blue-500 bg-white" oninput="updateFileNamePreview()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-blue-700 mb-1">Đối tượng học sinh</label>
+                        <input type="text" id="global-audience" placeholder="VD: NangCao" class="w-full border border-blue-200 rounded-md p-2 text-sm outline-none focus:border-blue-500 bg-white" oninput="updateFileNamePreview()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-blue-700 mb-1">Thời gian (Mặc định)</label>
+                        <input type="text" id="global-time" class="w-full border border-blue-200 rounded-md p-2 text-sm bg-blue-100/50 text-blue-600 font-medium outline-none cursor-not-allowed" readonly>
+                    </div>
+                </div>
+                <div class="text-sm text-blue-800 mt-1 bg-white p-2 rounded border border-blue-100 inline-block w-fit">
+                    Tên file mẫu dự kiến: <span id="global-preview-name" class="font-mono font-bold text-blue-600"></span><span class="text-slate-400">.json / .xlsx</span>
+                </div>
+            </div>
+
+            <div class="p-6">
+                <div id="section-excel-to-json" class="fade-in block">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <!-- Left Panel: Upload -->
+                        <div class="flex flex-col gap-4">
+                            <h3 class="text-lg font-semibold flex items-center gap-2">
+                                <i class="ph ph-upload-simple"></i> 1. Upload Excel File
+                            </h3>
+                            
+                            <label class="border-2 border-dashed border-slate-300 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-blue-400 transition-all group h-48">
+                                <div class="bg-green-100 text-green-600 p-3 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                                    <i class="ph ph-file-xls text-3xl"></i>
+                                </div>
+                                <span class="font-medium text-slate-700">Click to browse or drag file here</span>
+                                <span class="text-xs text-slate-500 mt-1">Supports .xlsx, .xls, .csv</span>
+                                <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
+                            </label>
+
+                            <div id="file-info" class="hidden bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-center gap-3">
+                                <i class="ph ph-file-text text-blue-500 text-xl"></i>
+                                <div class="flex-grow">
+                                    <p id="file-name" class="text-sm font-medium text-slate-800 truncate"></p>
+                                    <p id="sheet-count" class="text-xs text-slate-500"></p>
+                                </div>
+                                <button onclick="clearExcelInput()" class="text-slate-400 hover:text-red-500" title="Remove file">
+                                    <i class="ph ph-x-circle text-lg"></i>
+                                </button>
+                            </div>
+
+                            <div id="sheet-selector-container" class="hidden flex flex-col gap-2 mt-2">
+                                <label class="text-sm font-medium text-slate-700">Select Sheet:</label>
+                                <select id="sheet-selector" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" onchange="convertSelectedSheet()">
+                                    <!-- Options populated via JS -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Output -->
+                        <div class="flex flex-col gap-4 h-full">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    <i class="ph ph-code"></i> 2. JSON Output
+                                </h3>
+                                <div class="flex gap-2">
+                                    <button onclick="copyJsonOutput()" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50" id="btn-copy-json" disabled>
+                                        <i class="ph ph-copy"></i> Copy
+                                    </button>
+                                    <button onclick="downloadJson()" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50" id="btn-download-json" disabled>
+                                        <i class="ph ph-download-simple"></i> Download
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="relative flex-grow min-h-[300px]">
+                                <textarea id="json-output-viewer" class="w-full h-full border border-slate-300 rounded-lg p-4 text-sm bg-slate-50 text-slate-700 font-mono resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" readonly placeholder="JSON data will appear here after conversion..."></textarea>
+                                
+                                <div id="json-loading-overlay" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
+                                    <i class="ph ph-spinner-gap animate-spin text-3xl text-blue-600 mb-2"></i>
+                                    <span class="text-sm font-medium text-slate-600">Processing file...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="section-json-to-excel" class="hidden fade-in">
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <!-- Left Panel: Input -->
+                        <div class="flex flex-col gap-4 h-full">
+                             <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    <i class="ph ph-brackets-curly"></i> 1. Paste/Upload JSON
+                                </h3>
+                                <label class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer">
+                                     <i class="ph ph-upload-simple"></i> Load File
+                                     <input type="file" class="hidden" accept=".json" onchange="handleJsonUpload(event)">
+                                </label>
+                            </div>
+
+                            <div class="relative flex-grow min-h-[300px]">
+                                <textarea id="json-editor" class="w-full h-full border border-slate-300 rounded-lg p-4 text-sm bg-white text-slate-800 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Paste your JSON array here...&#10;Example:&#10;[&#10;  { &quot;id&quot;: 1, &quot;name&quot;: &quot;Alice&quot;, &quot;role&quot;: &quot;Admin&quot; },&#10;  { &quot;id&quot;: 2, &quot;name&quot;: &quot;Bob&quot;, &quot;role&quot;: &quot;User&quot; }&#10;]" oninput="validateJsonInput()"></textarea>
+                            </div>
+                            <div id="json-validation-msg" class="text-sm h-5 hidden"></div>
+                        </div>
+
+                        <!-- Right Panel: Output Settings & Download -->
+                        <div class="flex flex-col gap-4">
+                            <h3 class="text-lg font-semibold flex items-center gap-2">
+                                <i class="ph ph-gear"></i> 2. Excel Output Options
+                            </h3>
+                            
+                            <div class="bg-slate-50 border border-slate-200 rounded-lg p-5 flex flex-col gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Sheet Name</label>
+                                    <input type="text" id="export-sheet-name" value="Sheet1" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                </div>
+
+                                <div class="pt-4 mt-2 border-t border-slate-200">
+                                    <button onclick="convertAndDownloadExcel()" id="btn-generate-excel" class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                        <i class="ph ph-file-xls text-xl"></i> Generate & Download Excel
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Simple Preview Table -->
+                            <div class="mt-4 flex-grow flex flex-col">
+                                 <h4 class="text-sm font-medium text-slate-700 mb-2 flex justify-between items-center">
+                                     Data Preview
+                                     <span class="text-xs font-normal text-slate-500" id="preview-row-count">0 rows</span>
+                                 </h4>
+                                 <div class="border border-slate-200 rounded-lg overflow-x-auto bg-white flex-grow">
+                                     <table class="w-full text-sm text-left text-slate-500" id="preview-table">
+                                         <thead class="text-xs text-slate-700 uppercase bg-slate-50 sticky top-0" id="preview-thead">
+                                             <tr><th class="px-4 py-3 font-normal text-center text-slate-400">Waiting for valid JSON data...</th></tr>
+                                         </thead>
+                                         <tbody id="preview-tbody">
+                                             <!-- Rows generated via JS -->
+                                         </tbody>
+                                     </table>
+                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="how-to-use" class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 scroll-mt-24">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <i class="ph ph-book-open text-blue-600"></i> How to use this tool
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <!-- Guide: Excel to JSON -->
+                <div>
+                    <h3 class="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <i class="ph ph-file-xls"></i> Excel to JSON
+                    </h3>
+                    <ol class="space-y-4 text-slate-600 list-decimal list-inside marker:text-slate-400 marker:font-medium">
+                        <li>Ensure you have the <strong>"Excel to JSON"</strong> tab selected.</li>
+                        <li>Click the dashed upload area or drag and drop an Excel file (<code class="bg-slate-100 px-1 rounded">.xlsx</code>, <code class="bg-slate-100 px-1 rounded">.xls</code>, or <code class="bg-slate-100 px-1 rounded">.csv</code>).</li>
+                        <li>If your file contains multiple sheets, a dropdown will appear. Select the specific sheet you want to convert.</li>
+                        <li>The tool will automatically process the sheet. The first row of your Excel file will be used as the <strong>JSON keys</strong>.</li>
+                        <li>Review the generated JSON in the right panel.</li>
+                        <li>Use the <strong>Copy</strong> button to send it to your clipboard, or <strong>Download</strong> to save it as a <code class="bg-slate-100 px-1 rounded">.json</code> file.</li>
+                    </ol>
+                    <div class="mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-800">
+                        <strong>Note:</strong> Empty rows at the end of the sheet are ignored. Dates might be formatted as strings or numbers depending on how they are stored in Excel.
+                    </div>
+                </div>
+
+                <!-- Guide: JSON to Excel -->
+                <div>
+                    <h3 class="text-lg font-semibold text-blue-700 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <i class="ph ph-brackets-curly"></i> JSON to Excel
+                    </h3>
+                    <ol class="space-y-4 text-slate-600 list-decimal list-inside marker:text-slate-400 marker:font-medium">
+                        <li>Switch to the <strong>"JSON to Excel"</strong> tab at the top.</li>
+                        <li>Paste your JSON data into the editor on the left. You can also use the <strong>"Load File"</strong> button to read a <code class="bg-slate-100 px-1 rounded">.json</code> file from your computer.</li>
+                        <li>The JSON must be an <strong>array of objects</strong> (e.g., <code>[{"name": "John"}, {"name": "Jane"}]</code>).</li>
+                        <li>The tool will instantly validate the JSON. If valid, a quick preview of the table headers and first few rows will appear on the right.</li>
+                        <li>Optionally, customize the <strong>Sheet Name</strong> and output <strong>File Name</strong>.</li>
+                        <li>Click the green <strong>"Generate & Download Excel"</strong> button to save the file to your device.</li>
+                    </ol>
+                     <div class="mt-4 bg-blue-50 border-l-4 border-blue-400 p-3 text-sm text-blue-800">
+                        <strong>Privacy:</strong> All processing is done 100% locally in your browser. No data is ever sent to an external server.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center text-slate-400 text-sm py-4">
+            Built with HTML, Tailwind CSS, and SheetJS.
+        </footer>
+    </main>
+
+    <div id="toast-container" class="fixed bottom-4 right-4 flex flex-col gap-2 z-50"></div>
+
+    <script>
+        // --- State Variables ---
+        let currentWorkbook = null;
+        let currentJsonData = null;
+        let parsedJsonInput = null;
+
+        // --- Naming Logic ---
+        function getFormattedBaseName() {
+            const grade = document.getElementById('global-grade').value || 'Khac';
+            const lesson = document.getElementById('global-lesson').value.trim() || 'TenBai';
+            const audience = document.getElementById('global-audience').value.trim() || 'Chung';
+            
+            const now = new Date();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const timeStr = `${month}-${year}`;
+
+            // Loại bỏ ký tự không hợp lệ cho tên file trên hệ điều hành và thay dấu cách bằng gạch dưới
+            const sanitize = (str) => str.replace(/[\/\?<>\\:\*\|":]/g, '').replace(/\s+/g, '_');
+            
+            const safeLesson = sanitize(lesson);
+            const safeAudience = sanitize(audience);
+
+            const parts = [grade, safeLesson, safeAudience, timeStr].filter(Boolean);
+            return parts.join('_');
+        }
+
+        function updateFileNamePreview() {
+            const baseName = getFormattedBaseName();
+            document.getElementById('global-preview-name').textContent = baseName;
+        }
+
+        // Khởi tạo thời gian mặc định khi tải trang
+        window.addEventListener('DOMContentLoaded', () => {
+            const now = new Date();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            document.getElementById('global-time').value = `Tháng ${month}/${year}`;
+            updateFileNamePreview();
+        });
+
+        // --- UI Functions ---
+        
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            // Update Tab Buttons Styling
+            document.getElementById('tab-excel-to-json').classList.remove('tab-active');
+            document.getElementById('tab-json-to-excel').classList.remove('tab-active');
+            document.getElementById('tab-' + tabId).classList.add('tab-active');
+
+            // Toggle Sections
+            if (tabId === 'excel-to-json') {
+                document.getElementById('section-excel-to-json').classList.remove('hidden');
+                document.getElementById('section-json-to-excel').classList.add('hidden');
+            } else {
+                document.getElementById('section-excel-to-json').classList.add('hidden');
+                document.getElementById('section-json-to-excel').classList.remove('hidden');
+                // Trigger validation on switch just in case
+                validateJsonInput();
+            }
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            // Set styles based on type
+            let bgClass, iconClass, iconName;
+            if (type === 'success') {
+                bgClass = 'bg-green-100 border-green-200 text-green-800';
+                iconClass = 'text-green-500';
+                iconName = 'ph-check-circle';
+            } else if (type === 'error') {
+                bgClass = 'bg-red-100 border-red-200 text-red-800';
+                iconClass = 'text-red-500';
+                iconName = 'ph-warning-circle';
+            } else {
+                bgClass = 'bg-blue-100 border-blue-200 text-blue-800';
+                iconClass = 'text-blue-500';
+                iconName = 'ph-info';
+            }
+
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-lg border shadow-sm transform transition-all duration-300 translate-y-10 opacity-0 ${bgClass}`;
+            toast.innerHTML = `
+                <i class="ph ${iconName} text-xl ${iconClass}"></i>
+                <span class="font-medium text-sm">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            }, 10);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => {
+                    if (container.contains(toast)) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // --- EXCEL TO JSON LOGIC ---
+
+        // Handle Excel File Selection
+        function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Show loading
+            document.getElementById('json-loading-overlay').classList.remove('hidden');
+            
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    // Parse workbook using SheetJS
+                    currentWorkbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Update UI with file info
+                    document.getElementById('file-name').textContent = file.name;
+                    document.getElementById('sheet-count').textContent = `${currentWorkbook.SheetNames.length} sheet(s) found`;
+                    document.getElementById('file-info').classList.remove('hidden');
+
+                    // Populate Sheet Selector
+                    const selector = document.getElementById('sheet-selector');
+                    selector.innerHTML = ''; // Clear previous
+                    currentWorkbook.SheetNames.forEach(sheetName => {
+                        const option = document.createElement('option');
+                        option.value = sheetName;
+                        option.textContent = sheetName;
+                        selector.appendChild(option);
+                    });
+
+                    // Show selector if multiple sheets, otherwise hide but still process
+                    if (currentWorkbook.SheetNames.length > 1) {
+                        document.getElementById('sheet-selector-container').classList.remove('hidden');
+                    } else {
+                        document.getElementById('sheet-selector-container').classList.add('hidden');
+                    }
+
+                    // Convert first sheet by default
+                    convertSelectedSheet();
+                    showToast('File loaded successfully', 'success');
+
+                } catch (error) {
+                    console.error("Error parsing Excel:", error);
+                    showToast('Error reading Excel file. Ensure it is a valid format.', 'error');
+                } finally {
+                    document.getElementById('json-loading-overlay').classList.add('hidden');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Convert Specific Sheet to JSON
+        function convertSelectedSheet() {
+            if (!currentWorkbook) return;
+
+            const sheetName = document.getElementById('sheet-selector').value || currentWorkbook.SheetNames[0];
+            const worksheet = currentWorkbook.Sheets[sheetName];
+            
+            // Perform conversion. header: 1 gives array of arrays, default gives array of objects (using first row as keys)
+            // defval: "" ensures empty cells are included as empty strings rather than omitted
+            currentJsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+            
+            // Format and display JSON
+            const jsonString = JSON.stringify(currentJsonData, null, 2);
+            document.getElementById('json-output-viewer').value = jsonString;
+
+            // Enable buttons
+            document.getElementById('btn-copy-json').disabled = false;
+            document.getElementById('btn-download-json').disabled = false;
+        }
+
+        // Clear Excel Input
+        function clearExcelInput() {
+            document.getElementById('excel-file-input').value = '';
+            document.getElementById('file-info').classList.add('hidden');
+            document.getElementById('sheet-selector-container').classList.add('hidden');
+            document.getElementById('json-output-viewer').value = '';
+            
+            document.getElementById('btn-copy-json').disabled = true;
+            document.getElementById('btn-download-json').disabled = true;
+            
+            currentWorkbook = null;
+            currentJsonData = null;
+        }
+
+        // Copy JSON Output to Clipboard
+        function copyJsonOutput() {
+            const output = document.getElementById('json-output-viewer');
+            output.select();
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges(); // Deselect
+            showToast('JSON copied to clipboard', 'success');
+        }
+
+        // Download JSON Output as File
+        function downloadJson() {
+            if (!currentJsonData) return;
+            
+            const jsonString = JSON.stringify(currentJsonData, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Sử dụng bộ tạo tên file tùy chỉnh
+            a.download = getFormattedBaseName() + '.json';
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- JSON TO EXCEL LOGIC ---
+
+        // Handle JSON File Upload (Reads text into editor)
+        function handleJsonUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                document.getElementById('json-editor').value = content;
+                validateJsonInput(); // Trigger validation
+            };
+            reader.readAsText(file);
+            // Reset input so same file can be loaded again if needed
+            event.target.value = ''; 
+        }
+
+        // Validate JSON input in the editor and generate preview
+        function validateJsonInput() {
+            const input = document.getElementById('json-editor').value.trim();
+            const msgEl = document.getElementById('json-validation-msg');
+            const btnGenerate = document.getElementById('btn-generate-excel');
+            
+            const thead = document.getElementById('preview-thead');
+            const tbody = document.getElementById('preview-tbody');
+            const rowCountEl = document.getElementById('preview-row-count');
+
+            if (!input) {
+                msgEl.className = 'text-sm h-5 hidden';
+                btnGenerate.disabled = true;
+                parsedJsonInput = null;
+                resetPreview();
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(input);
+                
+                // Ensure it's an array for standard Excel conversion
+                if (!Array.isArray(parsed)) {
+                    throw new Error("JSON must be an array of objects to convert to a table.");
+                }
+                
+                if (parsed.length === 0) {
+                     throw new Error("JSON array is empty.");
+                }
+
+                if (typeof parsed[0] !== 'object' || parsed[0] === null) {
+                    throw new Error("Array items must be objects (key-value pairs).");
+                }
+
+                // Validation Passed
+                msgEl.textContent = 'Valid JSON Array detected.';
+                msgEl.className = 'text-sm h-5 text-green-600 font-medium flex items-center gap-1 before:content-["✓"]';
+                btnGenerate.disabled = false;
+                parsedJsonInput = parsed;
+                
+                generatePreview(parsed);
+
+            } catch (error) {
+                // Validation Failed
+                msgEl.textContent = 'Invalid JSON: ' + error.message;
+                msgEl.className = 'text-sm h-5 text-red-600 font-medium flex items-center gap-1 before:content-["!"]';
+                btnGenerate.disabled = true;
+                parsedJsonInput = null;
+                resetPreview();
+            }
+        }
+
+        // Reset the preview table to empty state
+        function resetPreview() {
+            document.getElementById('preview-thead').innerHTML = '<tr><th class="px-4 py-3 font-normal text-center text-slate-400">Waiting for valid JSON data...</th></tr>';
+            document.getElementById('preview-tbody').innerHTML = '';
+            document.getElementById('preview-row-count').textContent = '0 rows';
+        }
+
+        // Generate a small HTML table preview of the parsed JSON
+        function generatePreview(data) {
+            const thead = document.getElementById('preview-thead');
+            const tbody = document.getElementById('preview-tbody');
+            const rowCountEl = document.getElementById('preview-row-count');
+
+            rowCountEl.textContent = `${data.length} row(s)`;
+
+            // Extract all unique keys across first 10 items to form columns
+            let keys = new Set();
+            const sampleSize = Math.min(data.length, 10);
+            for(let i=0; i<sampleSize; i++){
+                if(data[i] && typeof data[i] === 'object') {
+                     Object.keys(data[i]).forEach(k => keys.add(k));
+                }
+            }
+            const columns = Array.from(keys);
+
+            if (columns.length === 0) {
+                 resetPreview();
+                 return;
+            }
+
+            // Build Header
+            let headerHtml = '<tr>';
+            columns.forEach(col => {
+                headerHtml += `<th scope="col" class="px-4 py-3 whitespace-nowrap">${escapeHTML(col)}</th>`;
+            });
+            headerHtml += '</tr>';
+            thead.innerHTML = headerHtml;
+
+            // Build Rows (max 5 for preview)
+            let bodyHtml = '';
+            const previewRows = Math.min(data.length, 5);
+            
+            for (let i = 0; i < previewRows; i++) {
+                bodyHtml += '<tr class="bg-white border-b border-slate-100 hover:bg-slate-50">';
+                columns.forEach(col => {
+                    let val = data[i][col];
+                    // Basic formatting for objects/arrays in cells
+                    if (typeof val === 'object' && val !== null) {
+                        val = JSON.stringify(val);
+                    } else if (val === undefined || val === null) {
+                        val = '';
+                    }
+                    bodyHtml += `<td class="px-4 py-2 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(String(val))}">${escapeHTML(String(val))}</td>`;
+                });
+                bodyHtml += '</tr>';
+            }
+            
+            if (data.length > 5) {
+                bodyHtml += `<tr><td colspan="${columns.length}" class="px-4 py-2 text-center text-xs text-slate-400 italic">... and ${data.length - 5} more rows not shown in preview</td></tr>`;
+            }
+
+            tbody.innerHTML = bodyHtml;
+        }
+
+        // Helper to prevent XSS in preview table
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag])
+            );
+        }
+
+        // Convert JSON and Trigger Download
+        function convertAndDownloadExcel() {
+            if (!parsedJsonInput) return;
+
+            try {
+                // 1. Create a new Workbook
+                const workbook = XLSX.utils.book_new();
+                
+                // 2. Convert JSON to Worksheet
+                const worksheet = XLSX.utils.json_to_sheet(parsedJsonInput);
+                
+                // Get sheet name from UI
+                let sheetName = document.getElementById('export-sheet-name').value.trim();
+                if (!sheetName) sheetName = "Sheet1";
+                // Excel limits sheet names to 31 chars
+                if (sheetName.length > 31) sheetName = sheetName.substring(0, 31);
+
+                // 3. Add Worksheet to Workbook
+                XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+                // Sử dụng bộ tạo tên file tùy chỉnh
+                const fileName = getFormattedBaseName() + ".xlsx";
+
+                // 4. Generate and download file using SheetJS built-in function
+                XLSX.writeFile(workbook, fileName);
+                
+                showToast(`Successfully exported ${fileName}`, 'success');
+
+            } catch (error) {
+                console.error("Export Error:", error);
+                showToast('Failed to generate Excel file. Check data format.', 'error');
+            }
+        }
+
+    </script>
+</body>
+</html>
