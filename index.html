@@ -70,12 +70,15 @@
         
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <!-- Tabs -->
-            <div class="flex border-b border-slate-200 bg-slate-50">
+            <div class="flex border-b border-slate-200 bg-slate-50 flex-wrap">
                 <button id="tab-excel-to-json" class="flex-1 py-4 px-6 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors tab-active flex items-center justify-center gap-2" onclick="switchTab('excel-to-json')">
                     <i class="ph ph-file-xls text-green-600 text-lg"></i> Excel to JSON
                 </button>
                 <button id="tab-json-to-excel" class="flex-1 py-4 px-6 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2" onclick="switchTab('json-to-excel')">
                     <i class="ph ph-brackets-curly text-blue-600 text-lg"></i> JSON to Excel
+                </button>
+                <button id="tab-latex" class="flex-1 py-4 px-6 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2" onclick="switchTab('latex')">
+                    <i class="ph ph-math-operations text-purple-600 text-lg"></i> Trích xuất LaTeX
                 </button>
             </div>
 
@@ -238,6 +241,77 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="section-latex" class="hidden fade-in">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Left Panel: Input -->
+                        <div class="flex flex-col gap-4 h-full">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    <i class="ph ph-file-code"></i> 1. Dán hoặc Tải file LaTeX
+                                </h3>
+                                <div class="flex items-center gap-2">
+                                    <label class="cursor-pointer text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md flex items-center gap-1 font-medium transition-colors border border-slate-200 shadow-sm">
+                                        <i class="ph ph-upload-simple"></i> Tải file .tex/.txt
+                                        <input type="file" id="latex-file-input" class="hidden" accept=".tex,.txt" onchange="handleLatexFileUpload(event)">
+                                    </label>
+                                    <button onclick="processLatex()" class="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors font-medium shadow-sm">
+                                        <i class="ph ph-magic-wand"></i> Xử lý dữ liệu
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="relative flex-grow min-h-[400px]">
+                                <textarea id="latex-input" class="w-full h-full border border-slate-300 rounded-lg p-4 text-sm bg-slate-800 text-slate-100 font-mono resize-none focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Dán mã LaTeX (chứa \begin{ex}, \begin{bt}...) hoặc nhấn nút 'Tải file .tex/.txt' ở trên..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Output & Exports -->
+                        <div class="flex flex-col gap-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    <i class="ph ph-table"></i> 2. Kết quả trích xuất
+                                </h3>
+                                <span class="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-1 rounded-full" id="latex-stats">0 câu hỏi</span>
+                            </div>
+                            
+                            <!-- Action Buttons: Có thêm nút Excel Trình Chiếu theo đúng mẫu -->
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <button onclick="downloadLatexExcelTrinhChieu()" id="btn-latex-excel-tc" class="py-2.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-700 col-span-2 sm:col-span-1" disabled title="Xuất đúng định dạng 11 cột trình chiếu">
+                                    <i class="ph ph-presentation text-xl"></i> Excel Trình Chiếu
+                                </button>
+                                <button onclick="downloadLatexExcel()" id="btn-latex-excel" class="py-2 px-2 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium rounded-lg border border-green-200 flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50" disabled>
+                                    <i class="ph ph-file-xls text-lg"></i> Excel Gốc
+                                </button>
+                                <button onclick="downloadLatexJson()" id="btn-latex-json" class="py-2 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-lg border border-blue-200 flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50" disabled>
+                                    <i class="ph ph-brackets-curly text-lg"></i> Xuất JSON
+                                </button>
+                                <button onclick="downloadLatexTikz()" id="btn-latex-tikz" class="py-2 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg border border-slate-300 flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50" disabled>
+                                    <i class="ph ph-image text-lg"></i> Tải mã TikZ (.txt)
+                                </button>
+                            </div>
+
+                            <!-- Preview Table -->
+                            <div class="border border-slate-200 rounded-lg overflow-hidden bg-white flex-grow flex flex-col h-[320px]">
+                                <div class="overflow-auto flex-grow">
+                                    <table class="w-full text-xs text-left text-slate-600" id="latex-preview-table">
+                                        <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
+                                            <tr>
+                                                <th class="px-3 py-2 whitespace-nowrap">Mã Câu</th>
+                                                <th class="px-3 py-2 whitespace-nowrap">Loại</th>
+                                                <th class="px-3 py-2 w-1/2">Nội dung</th>
+                                                <th class="px-3 py-2 whitespace-nowrap">Đáp án đúng</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="latex-preview-tbody" class="divide-y divide-slate-100">
+                                            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Nhấn "Xử lý dữ liệu" hoặc tải file lên để xem trước</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -282,6 +356,21 @@
                         <strong>Privacy:</strong> All processing is done 100% locally in your browser. No data is ever sent to an external server.
                     </div>
                 </div>
+
+                <div class="md:col-span-2 mt-4 pt-8 border-t border-slate-100">
+                    <h3 class="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <i class="ph ph-math-operations"></i> Tính năng Trích xuất LaTeX (Dành cho Giáo viên)
+                    </h3>
+                    <p class="text-sm text-slate-600 mb-4">
+                        Công cụ này được thiết kế chuyên biệt để bóc tách ngân hàng câu hỏi Toán từ định dạng LaTeX chuẩn (`ex`, `bt`) thành dữ liệu bảng (Excel/JSON) một cách sạch sẽ.
+                    </p>
+                    <ul class="space-y-2 text-sm text-slate-600 list-disc list-inside marker:text-purple-400">
+                        <li><strong>Hỗ trợ các dạng:</strong> Trắc nghiệm 4 lựa chọn (<code>\choice</code>), Trắc nghiệm Đúng/Sai (<code>\choiceTF</code>), và Trả lời ngắn (<code>\shortans</code>).</li>
+                        <li><strong>Nhận diện đáp án:</strong> Tự động tìm thẻ <code>\True</code> trong các phương án hoặc nội dung trong <code>\shortans{}</code> để xuất ra cột Đáp án.</li>
+                        <li><strong>Lọc nhiễu:</strong> Tự động loại bỏ các lệnh định dạng dư thừa như <code>\immini</code>, <code>\noindent</code>, <code>\begin{center}</code>, giữ lại cấu trúc toán học thuần túy.</li>
+                        <li><strong>Xử lý Hình vẽ:</strong> Toàn bộ các đoạn mã <code>\begin{tikzpicture}...\end{tikzpicture}</code> sẽ được tách riêng ra một file <code>.txt</code> để bạn tải về, giúp bảng Excel không bị nặng và rối. Trong file Excel/JSON sẽ để lại dấu <code>[HÌNH VẼ TIKZ]</code>.</li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -298,6 +387,10 @@
         let currentWorkbook = null;
         let currentJsonData = null;
         let parsedJsonInput = null;
+        
+        // --- STREAMING_CHUNK:LaTeX State Variables ---
+        let latexParsedData = [];
+        let tikzCodes = [];
 
         // --- Naming Logic ---
         function getFormattedBaseName() {
@@ -341,16 +434,17 @@
             // Update Tab Buttons Styling
             document.getElementById('tab-excel-to-json').classList.remove('tab-active');
             document.getElementById('tab-json-to-excel').classList.remove('tab-active');
+            document.getElementById('tab-latex').classList.remove('tab-active');
             document.getElementById('tab-' + tabId).classList.add('tab-active');
 
             // Toggle Sections
-            if (tabId === 'excel-to-json') {
-                document.getElementById('section-excel-to-json').classList.remove('hidden');
-                document.getElementById('section-json-to-excel').classList.add('hidden');
-            } else {
-                document.getElementById('section-excel-to-json').classList.add('hidden');
-                document.getElementById('section-json-to-excel').classList.remove('hidden');
-                // Trigger validation on switch just in case
+            document.getElementById('section-excel-to-json').classList.add('hidden');
+            document.getElementById('section-json-to-excel').classList.add('hidden');
+            document.getElementById('section-latex').classList.add('hidden');
+
+            document.getElementById('section-' + tabId).classList.remove('hidden');
+            
+            if (tabId === 'json-to-excel') {
                 validateJsonInput();
             }
         }
@@ -697,6 +791,383 @@
                 console.error("Export Error:", error);
                 showToast('Failed to generate Excel file. Check data format.', 'error');
             }
+        }
+
+        // --- STREAMING_CHUNK:LATEX PARSING LOGIC ---
+
+        /**
+         * Helper: Extract content within balanced braces '{' '}' immediately following a keyword.
+         * Useful for extracting options in \choice{A}{B}{C}{D} or \loigiai{...}
+         */
+        function getBalancedBlocks(str, startKeyword, count) {
+            let index = str.indexOf(startKeyword);
+            if (index === -1) return null;
+            
+            let blocks = [];
+            let currIndex = index + startKeyword.length;
+            
+            for (let i = 0; i < count; i++) {
+                // Find next '{' skipping whitespace
+                while (currIndex < str.length && /\s/.test(str[currIndex])) {
+                    currIndex++;
+                }
+                
+                if (str[currIndex] !== '{') {
+                    // Mismatched format, maybe empty trailing options
+                    blocks.push("");
+                    continue; 
+                }
+
+                let open = 1;
+                let braceEnd = -1;
+                for (let j = currIndex + 1; j < str.length; j++) {
+                    // Handle escaped braces \{ \} so they don't break logic
+                    if (str[j] === '{' && str[j-1] !== '\\') open++;
+                    if (str[j] === '}' && str[j-1] !== '\\') open--;
+                    
+                    if (open === 0) {
+                        braceEnd = j;
+                        break;
+                    }
+                }
+                
+                if (braceEnd !== -1) {
+                    blocks.push(str.substring(currIndex + 1, braceEnd));
+                    currIndex = braceEnd + 1;
+                } else {
+                    blocks.push(""); // Fail gracefully
+                }
+            }
+            
+            return {
+                blocks: blocks,
+                startIndex: index,
+                endIndex: currIndex
+            };
+        }
+
+        // Helper: Clean up irrelevant LaTeX formatting commands
+        function cleanLatexStr(str) {
+            if (!str) return "";
+            let s = str.trim();
+            
+            // Xử lý \immini{Nội dung}{Hình} -> Giữ lại nội dung câu hỏi
+            s = s.replace(/\\immini\s*\{([\s\S]*?)\}\s*\{[\s\S]*?\}/g, "$1"); 
+            
+            // Loại bỏ môi trường itemchoice và chuyển \itemch thành gạch đầu dòng
+            s = s.replace(/\\begin\{itemchoice\}/g, '').replace(/\\end\{itemchoice\}/g, '');
+            s = s.replace(/\\itemch\s*/g, '\n- ');
+
+            // Loại bỏ các khối căn lề
+            const blockTags = ['center', 'flushleft', 'flushright'];
+            blockTags.forEach(tag => {
+                let reStart = new RegExp(`\\\\begin\\{${tag}\\}`, 'g');
+                let reEnd = new RegExp(`\\\\end\\{${tag}\\}`, 'g');
+                s = s.replace(reStart, '').replace(reEnd, '');
+            });
+
+            // Loại bỏ các câu lệnh định dạng trang/trình bày không cần thiết
+            const removeCmds = [
+                '\\noindent', '\\break', '\\xuongdong', '\\allowdisplaybreaks',
+                '\\hfill', '\\centering', '\\raggedright', '\\par'
+            ];
+            removeCmds.forEach(cmd => {
+                s = s.split(cmd).join('');
+            });
+
+            // Làm sạch comment % (bỏ qua \%)
+            s = s.split('\n').map(line => {
+                let commentIdx = line.replace(/\\%/g, '##').indexOf('%');
+                if (commentIdx !== -1) {
+                    return line.substring(0, commentIdx);
+                }
+                return line;
+            }).join('\n');
+
+            // Xóa dòng trống thừa
+            s = s.replace(/\n\s*\n/g, '\n').trim();
+            return s;
+        }
+
+        // Tải file .tex hoặc .txt từ máy tính
+        function handleLatexFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('latex-input').value = e.target.result;
+                showToast(`Đã nạp file ${file.name}`, 'info');
+                // Tự động xử lý ngay sau khi tải file
+                processLatex();
+            };
+            reader.readAsText(file, 'utf-8');
+            event.target.value = '';
+        }
+
+        function processLatex() {
+            let input = document.getElementById('latex-input').value;
+            if (!input.trim()) {
+                showToast("Vui lòng nhập hoặc tải file mã LaTeX", "error");
+                return;
+            }
+
+            latexParsedData = [];
+            tikzCodes = [];
+
+            // 1. Trích xuất toàn bộ khối tikzpicture ra mảng riêng và đánh dấu vào văn bản
+            const tikzRegex = /\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\}/g;
+            input = input.replace(tikzRegex, (match) => {
+                tikzCodes.push(match);
+                return "\n[HÌNH VẼ TIKZ]\n";
+            });
+
+            // 2. Tìm các môi trường \begin{ex} và \begin{bt} kèm tag %[...] hoặc [...]
+            const itemRegex = /\\begin\{(ex|bt)\}(?:\s*%?\[(.*?)\])?([\s\S]*?)\\end\{\1\}/g;
+            let match;
+            let questionIndex = 1;
+            
+            while ((match = itemRegex.exec(input)) !== null) {
+                let type = match[1]; // 'ex' hoặc 'bt'
+                let tags = match[2] || '';
+                let content = match[3];
+
+                let itemObj = {
+                    "Mã Câu": `Q_${String(questionIndex).padStart(3, '0')}`,
+                    "Loại": "",
+                    "Mã (Tags)": tags.trim(),
+                    "Câu hỏi": "",
+                    "A": "", "B": "", "C": "", "D": "",
+                    "Đáp án đúng": "",
+                    "Lời giải": ""
+                };
+
+                // Trích xuất lời giải \loigiai{...}
+                let lgData = getBalancedBlocks(content, '\\loigiai', 1);
+                if (lgData) {
+                    itemObj["Lời giải"] = cleanLatexStr(lgData.blocks[0]);
+                    content = content.substring(0, lgData.startIndex) + content.substring(lgData.endIndex);
+                }
+
+                if (type === 'ex') {
+                    if (content.includes('\\choiceTF')) {
+                        itemObj["Loại"] = "Đúng/Sai";
+                        let qText = content.substring(0, content.indexOf('\\choiceTF'));
+                        itemObj["Câu hỏi"] = cleanLatexStr(qText);
+
+                        let optData = getBalancedBlocks(content, '\\choiceTF', 4);
+                        if (optData) {
+                            let opts = optData.blocks;
+                            let tfList = [];
+                            ['A', 'B', 'C', 'D'].forEach((label, idx) => {
+                                if (opts[idx] !== undefined) {
+                                    let optText = opts[idx].trim();
+                                    let isTrue = false;
+                                    if (optText.includes('\\True')) {
+                                        isTrue = true;
+                                        optText = optText.replace(/\\True\s*/g, '').trim();
+                                    }
+                                    const subLabel = ['a', 'b', 'c', 'd'][idx];
+                                    tfList.push(`${subLabel}-${isTrue ? 'Đúng' : 'Sai'}`);
+                                    itemObj[label] = cleanLatexStr(optText);
+                                }
+                            });
+                            // Định dạng: a-Đúng, b-Sai, c-Đúng, d-Đúng theo đúng ảnh mẫu
+                            itemObj["Đáp án đúng"] = tfList.join(', ');
+                        }
+                    } else if (content.includes('\\choice')) {
+                        itemObj["Loại"] = "Trắc nghiệm";
+                        let qText = content.substring(0, content.indexOf('\\choice'));
+                        itemObj["Câu hỏi"] = cleanLatexStr(qText);
+
+                        let optData = getBalancedBlocks(content, '\\choice', 4);
+                        if (optData) {
+                            let opts = optData.blocks;
+                            ['A', 'B', 'C', 'D'].forEach((label, idx) => {
+                                if (opts[idx] !== undefined) {
+                                    let optText = opts[idx].trim();
+                                    if (optText.includes('\\True')) {
+                                        itemObj["Đáp án đúng"] = label;
+                                        optText = optText.replace(/\\True\s*/g, '').trim();
+                                    }
+                                    itemObj[label] = cleanLatexStr(optText);
+                                }
+                            });
+                        }
+                    } else {
+                        itemObj["Loại"] = "Trắc nghiệm";
+                        itemObj["Câu hỏi"] = cleanLatexStr(content);
+                    }
+                } else if (type === 'bt') {
+                    itemObj["Loại"] = "Trả lời ngắn";
+                    if (content.includes('\\shortans')) {
+                        let qText = content.substring(0, content.indexOf('\\shortans'));
+                        itemObj["Câu hỏi"] = cleanLatexStr(qText);
+
+                        let ansData = getBalancedBlocks(content, '\\shortans', 1);
+                        if (ansData) {
+                            itemObj["Đáp án đúng"] = cleanLatexStr(ansData.blocks[0]);
+                        }
+                    } else {
+                        itemObj["Câu hỏi"] = cleanLatexStr(content);
+                    }
+                }
+
+                latexParsedData.push(itemObj);
+                questionIndex++;
+            }
+
+            // Cập nhật thống kê giao diện
+            document.getElementById('latex-stats').textContent = `${latexParsedData.length} câu hỏi, ${tikzCodes.length} TikZ`;
+            
+            // Kích hoạt các nút bấm
+            document.getElementById('btn-latex-excel-tc').disabled = latexParsedData.length === 0;
+            document.getElementById('btn-latex-json').disabled = latexParsedData.length === 0;
+            document.getElementById('btn-latex-excel').disabled = latexParsedData.length === 0;
+            document.getElementById('btn-latex-tikz').disabled = tikzCodes.length === 0;
+
+            renderLatexPreview();
+            
+            if (latexParsedData.length > 0) {
+                showToast(`Trích xuất thành công ${latexParsedData.length} câu hỏi`, 'success');
+            } else {
+                showToast(`Không tìm thấy môi trường \\begin{ex} hoặc \\begin{bt}`, 'error');
+            }
+        }
+
+        function renderLatexPreview() {
+            const tbody = document.getElementById('latex-preview-tbody');
+            
+            if (latexParsedData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Không có dữ liệu.</td></tr>';
+                return;
+            }
+
+            let html = '';
+            const previewCount = Math.min(latexParsedData.length, 50);
+            
+            for(let i = 0; i < previewCount; i++) {
+                let row = latexParsedData[i];
+                let typeBadge = '';
+                if(row['Loại'] === 'Trắc nghiệm') typeBadge = '<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-semibold">Trắc nghiệm</span>';
+                else if(row['Loại'] === 'Đúng/Sai') typeBadge = '<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-semibold">Đúng/Sai</span>';
+                else typeBadge = '<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-semibold">Trả lời ngắn</span>';
+
+                html += `
+                    <tr class="hover:bg-slate-50 border-b border-slate-50 last:border-0">
+                        <td class="px-3 py-2 font-mono text-[11px] font-semibold text-slate-500 whitespace-nowrap">${row['Mã Câu']}</td>
+                        <td class="px-3 py-2 whitespace-nowrap">${typeBadge}</td>
+                        <td class="px-3 py-2">
+                            <div class="line-clamp-2 text-slate-800" title="${escapeHTML(row['Câu hỏi'])}">${escapeHTML(row['Câu hỏi'])}</div>
+                            ${row['Mã (Tags)'] ? `<div class="text-[10px] text-slate-400 mt-0.5">🏷️ ${escapeHTML(row['Mã (Tags)'])}</div>` : ''}
+                        </td>
+                        <td class="px-3 py-2 font-medium text-slate-900 whitespace-nowrap">${escapeHTML(row['Đáp án đúng'])}</td>
+                    </tr>
+                `;
+            }
+            tbody.innerHTML = html;
+        }
+
+        // Xuất file Excel Trình Chiếu với đúng 11 cột khớp hoàn toàn theo ảnh mẫu
+        function downloadLatexExcelTrinhChieu() {
+            if (!latexParsedData || latexParsedData.length === 0) return;
+            try {
+                const presentationRows = latexParsedData.map(item => ({
+                    "Mã Câu": item["Mã Câu"],
+                    "Loại": item["Loại"],
+                    "Chuyên đề": item["Mã (Tags)"] || "",
+                    "Nội dung": item["Câu hỏi"] || "",
+                    "Link Ảnh": "",
+                    "Lựa chọn A / Mệnh đề a": item["A"] || "",
+                    "Lựa chọn B / Mệnh đề b": item["B"] || "",
+                    "Lựa chọn C / Mệnh đề c": item["C"] || "",
+                    "Lựa chọn D / Mệnh đề d": item["D"] || "",
+                    "Đáp án đúng": item["Đáp án đúng"] || "",
+                    "Lời giải": item["Lời giải"] || ""
+                }));
+
+                const workbook = XLSX.utils.book_new();
+                const worksheet = XLSX.utils.json_to_sheet(presentationRows);
+
+                // Thiết lập độ rộng cột tối ưu cho trình chiếu
+                worksheet['!cols'] = [
+                    { wch: 10 }, // Mã Câu
+                    { wch: 15 }, // Loại
+                    { wch: 15 }, // Chuyên đề
+                    { wch: 45 }, // Nội dung
+                    { wch: 12 }, // Link Ảnh
+                    { wch: 25 }, // Lựa chọn A / Mệnh đề a
+                    { wch: 25 }, // Lựa chọn B / Mệnh đề b
+                    { wch: 25 }, // Lựa chọn C / Mệnh đề c
+                    { wch: 25 }, // Lựa chọn D / Mệnh đề d
+                    { wch: 28 }, // Đáp án đúng
+                    { wch: 45 }  // Lời giải
+                ];
+
+                XLSX.utils.book_append_sheet(workbook, worksheet, "TrinhChieu");
+                const fileName = getFormattedBaseName() + "_Excel_TrinhChieu.xlsx";
+                XLSX.writeFile(workbook, fileName);
+                showToast(`Đã xuất thành công: ${fileName}`, 'success');
+            } catch (error) {
+                console.error("Lỗi xuất Excel trình chiếu:", error);
+                showToast('Lỗi khi xuất file Excel Trình Chiếu', 'error');
+            }
+        }
+
+        // Xuất Excel từ dữ liệu Latex
+        function downloadLatexExcel() {
+            if (latexParsedData.length === 0) return;
+            try {
+                const workbook = XLSX.utils.book_new();
+                const worksheet = XLSX.utils.json_to_sheet(latexParsedData);
+                XLSX.utils.book_append_sheet(workbook, worksheet, "NganHangCauHoi");
+                const fileName = getFormattedBaseName() + "_LaTeX.xlsx";
+                XLSX.writeFile(workbook, fileName);
+                showToast(`Đã xuất ${fileName}`, 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Lỗi khi xuất Excel', 'error');
+            }
+        }
+
+        // Xuất JSON từ dữ liệu Latex
+        function downloadLatexJson() {
+            if (latexParsedData.length === 0) return;
+            const jsonString = JSON.stringify(latexParsedData, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = getFormattedBaseName() + "_LaTeX.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Đã xuất file JSON', 'success');
+        }
+
+        // Xuất file .txt chứa mã TikZ
+        function downloadLatexTikz() {
+            if (tikzCodes.length === 0) return;
+            
+            let content = "=== MÃ TIKZ ĐƯỢC TRÍCH XUẤT TỪ CÂU HỎI ===\n";
+            content += "Lưu ý: Các hình này tương ứng với vị trí [HÌNH VẼ TIKZ] trong file Excel/JSON.\n\n";
+            
+            tikzCodes.forEach((code, index) => {
+                content += `--- Hình ${index + 1} ---\n`;
+                content += code + "\n\n";
+            });
+
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = getFormattedBaseName() + "_TikZ.txt";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Đã xuất file mã hình học TikZ', 'success');
         }
 
     </script>
